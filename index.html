@@ -441,6 +441,30 @@
             font-size: 1.1rem;
         }
         
+        .proxy-status {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        
+        .retry-btn {
+            display: block;
+            margin: 15px auto;
+            padding: 10px 20px;
+            background: var(--button-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .retry-btn:hover {
+            background: var(--button-hover);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -477,7 +501,7 @@
     
     <div class="container">
         <header>
-            <h1>Faxal DB</h1>
+            <h1>Fazal-e-Azeem</h1>
             <p class="tagline">SECURE INFORMATION RETRIEVAL SYSTEM</p>
             <button class="theme-toggle" id="themeToggle">
                 <i class="fas fa-moon"></i> DARK MODE
@@ -591,7 +615,8 @@
                 }
             });
             
-            function searchInfo() {
+            // Improved API integration with multiple fallbacks
+            async function searchInfo() {
                 const searchValue = searchInput.value.trim();
                 
                 if (!searchValue) {
@@ -630,53 +655,87 @@
                     </div>
                 `;
                 
-                // Use the same API for both phone and CNIC search
-                searchByNumber(searchValue, searchType);
+                // Try multiple API endpoints with fallbacks
+                try {
+                    const data = await tryMultipleEndpoints(searchValue);
+                    handleApiResponse(data, searchType, searchValue);
+                } catch (error) {
+                    console.error('All API attempts failed:', error);
+                    showErrorWithRetry('DATABASE CONNECTION FAILED. ALL ATTEMPTS EXHAUSTED.');
+                }
             }
             
-            function searchByNumber(searchValue, type) {
-                // Same API for both phone and CNIC
-                const apiUrl = `https://fam-official.serv00.net/api/database.php?number=${searchValue}`;
+            // Try multiple endpoints with different proxies
+            async function tryMultipleEndpoints(searchValue) {
+                const baseApiUrl = `https://fam-official.serv00.net/api/database.php?number=${searchValue}`;
                 
-                fetch(apiUrl)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('NETWORK RESPONSE ERROR');
+                // List of proxy endpoints to try
+                const endpoints = [
+                    baseApiUrl, // Direct call first
+                    `https://api.allorigins.win/raw?url=${encodeURIComponent(baseApiUrl)}`,
+                    `https://corsproxy.io/?${encodeURIComponent(baseApiUrl)}`,
+                    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(baseApiUrl)}`,
+                    `https://thingproxy.freeboard.io/fetch/${baseApiUrl}`
+                ];
+                
+                let lastError;
+                
+                for (let i = 0; i < endpoints.length; i++) {
+                    try {
+                        // Update status
+                        if (i > 0) {
+                            resultContainer.innerHTML = `
+                                <div class="loading">
+                                    <i class="fas fa-sync-alt"></i> TRYING PROXY ${i}/${endpoints.length-1}...
+                                </div>
+                                <div class="proxy-status">Attempting connection via backup server...</div>
+                            `;
                         }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('API Response:', data);
-                        handleApiResponse(data, type, searchValue);
-                    })
-                    .catch(error => {
-                        console.error('Error fetching data:', error);
-                        // Try with proxy if direct fetch fails
-                        tryProxyFetch(searchValue, type);
-                    });
+                        
+                        const response = await fetchWithTimeout(endpoints[i], 8000);
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        
+                        // Validate response structure
+                        if (data && (data.success || data.data)) {
+                            console.log(`Success with endpoint ${i}`);
+                            return data;
+                        } else {
+                            throw new Error('Invalid response format');
+                        }
+                    } catch (error) {
+                        lastError = error;
+                        console.log(`Endpoint ${i} failed:`, error);
+                        // Continue to next endpoint
+                    }
+                }
+                
+                throw lastError || new Error('All endpoints failed');
             }
             
-            function tryProxyFetch(searchValue, type) {
-                const proxyUrl = 'https://api.allorigins.win/raw?url=';
-                const apiUrl = `https://fam-official.serv00.net/api/database.php?number=${searchValue}`;
-                
-                const url = proxyUrl + encodeURIComponent(apiUrl);
-                
-                fetch(url)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('PROXY RESPONSE ERROR');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('Proxy API Response:', data);
-                        handleApiResponse(data, type, searchValue);
-                    })
-                    .catch(error => {
-                        console.error('Proxy fetch failed:', error);
-                        showError('DATABASE CONNECTION FAILED. TRY AGAIN.');
-                    });
+            // Fetch with timeout
+            function fetchWithTimeout(url, timeout) {
+                return new Promise((resolve, reject) => {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => {
+                        controller.abort();
+                        reject(new Error('Request timeout'));
+                    }, timeout);
+                    
+                    fetch(url, { signal: controller.signal })
+                        .then(response => {
+                            clearTimeout(timeoutId);
+                            resolve(response);
+                        })
+                        .catch(error => {
+                            clearTimeout(timeoutId);
+                            reject(error);
+                        });
+                });
             }
             
             function handleApiResponse(data, type, searchValue) {
@@ -790,6 +849,23 @@
                     </div>
                 `;
             }
+            
+            function showErrorWithRetry(message) {
+                resultContainer.innerHTML = `
+                    <div class="no-data">
+                        <i class="fas fa-exclamation-triangle"></i><br>
+                        ${message}
+                        <button class="retry-btn" onclick="retrySearch()">
+                            <i class="fas fa-redo"></i> TRY AGAIN
+                        </button>
+                    </div>
+                `;
+            }
+            
+            // Global retry function
+            window.retrySearch = function() {
+                searchInfo();
+            };
         });
     </script>
 </body>
