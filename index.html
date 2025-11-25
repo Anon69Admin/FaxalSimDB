@@ -27,20 +27,6 @@
             --success-color: #00ff00;
         }
         
-        .light-mode {
-            --bg-primary: #f0f0f0;
-            --bg-secondary: #ffffff;
-            --text-primary: #006600;
-            --text-secondary: #008800;
-            --accent: #008800;
-            --accent-glow: rgba(0, 136, 0, 0.2);
-            --border-color: #cccccc;
-            --button-bg: #e0e0e0;
-            --button-hover: #d0d0d0;
-            --error-color: #cc0000;
-            --success-color: #008800;
-        }
-        
         body {
             background: var(--bg-primary);
             color: var(--text-primary);
@@ -134,24 +120,6 @@
             opacity: 0.9;
             margin-bottom: 20px;
             color: var(--text-secondary);
-        }
-        
-        .theme-toggle {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: var(--button-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 8px 12px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .theme-toggle:hover {
-            background: var(--button-hover);
-            box-shadow: 0 0 10px var(--accent-glow);
         }
         
         .tool-container {
@@ -503,7 +471,6 @@
         <header>
             <h1>FAXAL</h1>
             <p class="tagline">SECURE INFORMATION RETRIEVAL SYSTEM</p>
-
         </header>
         
         <div class="tool-container">
@@ -565,17 +532,6 @@
             }
             
             createMatrixEffect();
-            
-            // Theme toggle
-            const themeToggle = document.getElementById('themeToggle');
-            themeToggle.addEventListener('click', function() {
-                document.body.classList.toggle('light-mode');
-                if (document.body.classList.contains('light-mode')) {
-                    themeToggle.innerHTML = '<i class="fas fa-sun"></i> LIGHT MODE';
-                } else {
-                    themeToggle.innerHTML = '<i class="fas fa-moon"></i> DARK MODE';
-                }
-            });
             
             const searchBtn = document.getElementById('searchBtn');
             const searchInput = document.getElementById('searchInput');
